@@ -1,6 +1,7 @@
 const User = require("../model/userModel");
 const AppError = require("../utils/appError");
 const catchAsync = require("../utils/catchAsync");
+const { promisify } = require("util");
 const jwt = require("jsonwebtoken");
 
 const signToken = (id) => {
@@ -35,8 +36,6 @@ const createSendToken = (user, statusCode, req, res) => {
     expires: new Date(
       Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
     ),
-    httpOnly: true,
-    secure: req.secure || req.headers["x-forwarded-proto"] === "https",
   });
 
   // Remove password from output
@@ -81,10 +80,50 @@ exports.signup = catchAsync(async (req, res, next) => {
 
 exports.list = catchAsync(async (req, res, next) => {
   const users = await User.find({});
-  res.status(404).json({
-    status: "fail",
+  res.status(200).json({
+    status: "success",
     data: {
       data: users,
     },
   });
+});
+
+exports.protect = catchAsync(async (req, res, next) => {
+  // 1) Getting token and check of it's there
+  const token = req.body.token;
+  // if (
+  //   req.headers.authorization &&
+  //   req.headers.authorization.startsWith("Bearer")
+  // ) {
+  //   token = req.headers.authorization.split(" ")[1];
+  // } else if (req.cookies.jwt) {
+  //   token = req.cookies.jwt;
+  // }
+  console.log(token, typeof token);
+  if (!token) {
+    res.status(404).json({
+      status: "fail",
+      data: {
+        data: false,
+        err: "token is mot found",
+      },
+    });
+  }
+  try {
+    // 2) Verification token
+    const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+    res.status(200).json({
+      status: "success",
+      data: {
+        data: true,
+      },
+    });
+  } catch (err) {
+    res.status(404).json({
+      status: "fail",
+      data: {
+        data: false,
+      },
+    });
+  }
 });
